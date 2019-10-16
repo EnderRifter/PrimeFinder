@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29409.12
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PrimeFinderCore", "PrimeFinderCore\PrimeFinderCore.csproj", "{2C212EE9-B508-421F-A323-EE123BB9D797}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PrimeNumberFinder", "PrimeNumberFinder\PrimeNumberFinder.csproj", "{AD62C4B3-3AC8-4056-8A50-C3C926280BF4}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2C212EE9-B508-421F-A323-EE123BB9D797}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2C212EE9-B508-421F-A323-EE123BB9D797}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2C212EE9-B508-421F-A323-EE123BB9D797}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2C212EE9-B508-421F-A323-EE123BB9D797}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AD62C4B3-3AC8-4056-8A50-C3C926280BF4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AD62C4B3-3AC8-4056-8A50-C3C926280BF4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AD62C4B3-3AC8-4056-8A50-C3C926280BF4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AD62C4B3-3AC8-4056-8A50-C3C926280BF4}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {AC71AAA7-2501-4AFA-AE60-21F8A760DA3D}
+	EndGlobalSection
+EndGlobal
