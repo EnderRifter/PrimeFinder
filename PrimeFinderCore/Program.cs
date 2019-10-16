@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 namespace PrimeFinderCore
@@ -109,11 +108,6 @@ namespace PrimeFinderCore
     internal class Program
     {
         /// <summary>
-        /// Allows for work to be done in parallel.
-        /// </summary>
-        private static readonly ThreadedBatcher<PrimeBounds, ulong[]> batcher;
-
-        /// <summary>
         /// The number of threads that should batch out work to the worker threads.
         /// </summary>
         private static readonly int BatcherThreadCount = 1;
@@ -126,7 +120,12 @@ namespace PrimeFinderCore
         /// <summary>
         /// The number of threads that should process batches.
         /// </summary>
-        private static readonly int WorkerThreadCount = 10;
+        private static readonly int WorkerThreadCount = 1;
+
+        /// <summary>
+        /// Allows for work to be done in parallel.
+        /// </summary>
+        private static ThreadedBatcher<PrimeBounds, ulong[]> batcher;
 
         /// <summary>
         /// Initialises a new instance of the <see cref="Program"/> class.
@@ -185,12 +184,33 @@ namespace PrimeFinderCore
             SourceState sourceState = new SourceState
             {
                 LowestBound = 2,
-                HighestBound = 15485864,
+                HighestBound = 100_000_000,
                 CurrentLowerBound = 0,
                 CurrentUpperBound = 0 + SourceState.Increment
             };
+
             WorkerState workerState = new WorkerState();
+
             SinkState sinkState = new SinkState();
+
+            int workerThreadCount;
+            do
+            {
+                try
+                {
+                    Console.WriteLine("How many threads should be ran in parallel:");
+                    string inp = Console.ReadLine();
+                    workerThreadCount = Convert.ToInt32(inp);
+                    workerThreadCount = workerThreadCount < 0 ? 1 : workerThreadCount;
+                    break;
+                }
+                catch (FormatException)
+                {
+                    Console.WriteLine("Invalid format. Please try again.");
+                }
+            } while (true);
+
+            batcher = new ThreadedBatcher<PrimeBounds, ulong[]>(BatcherThreadCount, workerThreadCount, MergerThreadCount);
 
             Console.WriteLine("Initialising batcher.");
             batcher.Initialise(GenerateBatch, sourceState, ProcessBatch, workerState, CollateBatch, sinkState);

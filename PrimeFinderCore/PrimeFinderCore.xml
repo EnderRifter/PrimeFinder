@@ -71,11 +71,6 @@
         <member name="M:PrimeFinderCore.PrimeFinderBatch.Process">
             <inheritdoc />
         </member>
-        <member name="F:PrimeFinderCore.Program.batcher">
-            <summary>
-            Allows for work to be done in parallel.
-            </summary>
-        </member>
         <member name="F:PrimeFinderCore.Program.BatcherThreadCount">
             <summary>
             The number of threads that should batch out work to the worker threads.
@@ -89,6 +84,11 @@
         <member name="F:PrimeFinderCore.Program.WorkerThreadCount">
             <summary>
             The number of threads that should process batches.
+            </summary>
+        </member>
+        <member name="F:PrimeFinderCore.Program.batcher">
+            <summary>
+            Allows for work to be done in parallel.
             </summary>
         </member>
         <member name="M:PrimeFinderCore.Program.#cctor">
