@@ -1,0 +1,2 @@
+# PrimeFinder
+Finds prime numbers.
