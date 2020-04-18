@@ -1,264 +1,319 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
+using System.Diagnostics;
 
 namespace PrimeFinderCore
 {
-    /// <summary>
-    /// Represent a set of bounds that should be checked for prime numbers.
-    /// </summary>
-    internal readonly struct PrimeBounds
-    {
-        internal readonly ulong LowerBound;
-
-        internal readonly ulong UpperBound;
-
-        /// <summary>
-        /// Initialises a new instance of the <see cref="PrimeBounds"/> struct.
-        /// </summary>
-        internal PrimeBounds(ulong lowerBound, ulong upperBound)
-        {
-            LowerBound = lowerBound;
-
-            UpperBound = upperBound;
-        }
-    }
-
-    /// <summary>
-    /// Represents a batch of numbers that should be searched for primes.
-    /// </summary>
-    internal struct PrimeFinderBatch : IBatch<PrimeBounds, ulong[]>
-    {
-        /// <summary>
-        /// Initialises a new instance of the <see cref="PrimeFinderBatch"/> struct.
-        /// </summary>
-        /// <param name="bounds">The bounds that should be searched for primes.</param>
-        public PrimeFinderBatch(PrimeBounds bounds)
-        {
-            IsCompleted = false;
-
-            Input = bounds;
-
-            Output = new ulong[0];
-        }
-
-        /// <inheritdoc />
-        public PrimeBounds Input { get; }
-
-        /// <inheritdoc />
-        public bool IsCompleted { get; set; }
-
-        /// <inheritdoc />
-        public ulong[] Output { get; set; }
-
-        /// <summary>
-        /// Checks whether the given number is prime.
-        /// </summary>
-        /// <param name="number">The number to check.</param>
-        /// <returns>Whether the given number is prime or not.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool CheckPrime(ulong number)
-        {
-            if (number <= 1)
-            {
-                return false;
-            }
-
-            if (number <= 3)
-            {
-                return true;
-            }
-
-            if (number % 2 == 0 || number % 3 == 0)
-            {
-                return false;
-            }
-
-            uint i = 5;
-            while (i * i <= number)
-            {
-                if (number % i == 0 || number % (i + 2) == 0)
-                {
-                    return false;
-                }
-
-                i += 6;
-            }
-            return true;
-        }
-
-        /// <inheritdoc />
-        public void Process()
-        {
-            List<ulong> filteredPrimes = new List<ulong>();
-
-            for (ulong i = Input.LowerBound; i < Input.UpperBound; i++)
-            {
-                if (CheckPrime(i))
-                {
-                    filteredPrimes.Add(i);
-                }
-            }
-
-            Output = filteredPrimes.ToArray();
-            IsCompleted = true;
-        }
-    }
-
     internal class Program
     {
-        /// <summary>
-        /// The number of threads that should batch out work to the worker threads.
-        /// </summary>
-        private static readonly int BatcherThreadCount = 1;
-
-        /// <summary>
-        /// The number of threads that should collate completed batches from the worker threads.
-        /// </summary>
-        private static readonly int MergerThreadCount = 1;
-
-        /// <summary>
-        /// The number of threads that should process batches.
-        /// </summary>
-        private static readonly int WorkerThreadCount = 1;
-
-        /// <summary>
-        /// Allows for work to be done in parallel.
-        /// </summary>
-        private static ThreadedBatcher<PrimeBounds, ulong[]> batcher;
-
-        /// <summary>
-        /// Initialises a new instance of the <see cref="Program"/> class.
-        /// </summary>
-        static Program()
-        {
-            batcher = new ThreadedBatcher<PrimeBounds, ulong[]>(BatcherThreadCount, WorkerThreadCount, MergerThreadCount);
-        }
-
-        /// <summary>
-        /// Collates processed batches into the final <see cref="SinkState"/> instance.
-        /// </summary>
-        private static void CollateBatch(IBatch<PrimeBounds, ulong[]> processedBatch, SinkState state)
-        {
-#if DEBUG
-            Console.WriteLine($"Sink thread received {processedBatch.Output.Length} primes to merge into output list.");
-#endif
-            lock (state.FoundPrimes)
-            {
-                state.FoundPrimes.AddRange(processedBatch.Output);
-            }
-        }
-
-        /// <summary>
-        /// Generates <see cref="PrimeFinderBatch"/> instances to be computed.
-        /// </summary>
-        private static IBatch<PrimeBounds, ulong[]> GenerateBatch(int sourceThreadId, SourceState state)
-        {
-            if (state.CurrentLowerBound >= state.HighestBound)
-            {
-                return new ThreadedBatcher<PrimeBounds, ulong[]>.SentinelBatch();
-            }
-            else
-            {
-                // create a new prime bound, increment lower and upper bounds, and return a new batch
-                PrimeBounds newBounds = new PrimeBounds(state.CurrentLowerBound,
-                    state.CurrentUpperBound > state.HighestBound ? state.HighestBound : state.CurrentUpperBound);
-
-                state.CurrentLowerBound = state.CurrentUpperBound + 1;
-                state.CurrentUpperBound += SourceState.Increment;
-
-                // cap upper bound to the highest possible bound
-                state.CurrentUpperBound = state.CurrentUpperBound > state.HighestBound
-                    ? state.HighestBound
-                    : state.CurrentUpperBound;
-
-                return new PrimeFinderBatch(newBounds);
-            }
-        }
-
         private static void Main(string[] args)
         {
             Console.WriteLine("Hello World!");
 
-            // we created explicit types to utilise generic type-safety guarantees
-            SourceState sourceState = new SourceState
+            const int upperPrimeBound = 15485864; //1_000_000_000;
+            const int segmentSize = 3_000; //10_000;
+
+            static void Benchmark(Func<int, List<int>> sieveFunc, int upperPrimeBound)
             {
-                LowestBound = 2,
-                HighestBound = 100_000_000,
-                CurrentLowerBound = 0,
-                CurrentUpperBound = 0 + SourceState.Increment
-            };
+                Stopwatch stopwatch = new Stopwatch();
 
-            WorkerState workerState = new WorkerState();
+                stopwatch.Start();
+                List<int> primes = sieveFunc(upperPrimeBound);
+                stopwatch.Stop();
 
-            SinkState sinkState = new SinkState();
+                Console.WriteLine($"We found {primes.Count} primes below {upperPrimeBound} with {sieveFunc.Method.Name} in {stopwatch.ElapsedTicks} ticks");
 
-            int workerThreadCount;
-            do
+                GC.Collect();
+            }
+
+            static void BenchmarkSegmented(Func<int, int, List<int>> sieveFunc, int upperPrimeBound, int segmentSize)
             {
-                try
+                Stopwatch stopwatch = new Stopwatch();
+
+                stopwatch.Start();
+                List<int> primes = sieveFunc(upperPrimeBound, segmentSize);
+                stopwatch.Stop();
+
+                Console.WriteLine($"We found {primes.Count} primes below {upperPrimeBound} with {sieveFunc.Method.Name} in {stopwatch.ElapsedTicks} ticks");
+
+                GC.Collect();
+            }
+
+            static void SieveDiff(Func<int, List<int>> sieveA, Func<int, List<int>> sieveB, int upperPrimeBound)
+            {
+                List<int> primeListA = sieveA(upperPrimeBound);
+                HashSet<int> primeSetA = new HashSet<int>(primeListA);
+                GC.Collect();
+
+                List<int> primeListB = sieveB(upperPrimeBound);
+                HashSet<int> primeSetB = new HashSet<int>(primeListB);
+                GC.Collect();
+
+                Console.WriteLine($"Found {primeListA.Count} primes with sieve A, and {primeListB.Count} primes with sieve B");
+
+                List<int> diff = new List<int>();
+
+                foreach (int item in primeListA)
                 {
-                    Console.WriteLine("How many threads should be ran in parallel:");
-                    string inp = Console.ReadLine();
-                    workerThreadCount = Convert.ToInt32(inp);
-                    workerThreadCount = workerThreadCount < 0 ? 1 : workerThreadCount;
-                    break;
+                    if (primeSetB.Contains(item)) continue;
+
+                    Console.WriteLine($"Primes list A has member {item}, which does not appear in prime list B.");
+                    diff.Add(item);
                 }
-                catch (FormatException)
+
+                foreach (int item in primeListB)
                 {
-                    Console.WriteLine("Invalid format. Please try again.");
+                    if (primeSetA.Contains(item)) continue;
+
+                    Console.WriteLine($"Primes list B has member {item}, which does not appear in prime list A.");
+                    diff.Add(item);
                 }
-            } while (true);
 
-            batcher = new ThreadedBatcher<PrimeBounds, ulong[]>(BatcherThreadCount, workerThreadCount, MergerThreadCount);
+                if (diff.Count == 0)
+                {
+                    Console.WriteLine("No differences were found between the two prime lists!");
+                }
+            }
 
-            Console.WriteLine("Initialising batcher.");
-            batcher.Initialise(GenerateBatch, sourceState, ProcessBatch, workerState, CollateBatch, sinkState);
+            Benchmark(SieveOfEratosthenes, upperPrimeBound);
 
-            long elapsedMilliseconds = batcher.UntilFinished();
+            Benchmark(SieveOfEratosthenesOptimised, upperPrimeBound);
 
-            Console.WriteLine("Batcher finished.");
-            Console.WriteLine(
-                $"Found {sinkState.FoundPrimes.Count} primes between {sourceState.LowestBound} and {sourceState.HighestBound}" +
-                $" in {elapsedMilliseconds} milliseconds.");
+            BenchmarkSegmented(SegmentedSieveOfEratosthenes, upperPrimeBound, segmentSize);
+
+            SieveDiff(SieveOfEratosthenesOptimised, bound => SegmentedSieveOfEratosthenes(bound, segmentSize), upperPrimeBound);
 
             Console.WriteLine("Goodbye World!");
         }
 
-        /// <summary>
-        /// Processes <see cref="PrimeFinderBatch"/> instances using the Sieve of Eratosthenes.
-        /// </summary>
-        private static void ProcessBatch(IBatch<PrimeBounds, ulong[]> newBatch, WorkerState state)
+        private static List<int> SieveOfEratosthenes(int upperBound)
         {
-            newBatch.Process();
+            if (upperBound < 2)
+            {
+                throw new ArgumentException("No primes in desired range; upperBound too small!");
+            }
+            
+            if (upperBound == 2)
+            {
+                return new List<int> { 2 };
+            }
+
+            List<int> primes = new List<int>();
+
+            bool[] primalityMatrix = new bool[upperBound + 1];
+
+            for (int i = 2; i < primalityMatrix.Length; i++)
+            {
+                primalityMatrix[i] = true;
+            }
+
+            primalityMatrix[0] = false;
+            primalityMatrix[1] = false;
+
+            for (int primeCandidate = 2; primeCandidate < upperBound; primeCandidate++)
+            {
+                if (!primalityMatrix[primeCandidate]) continue;  // ignore non-prime number
+
+                primes.Add(primeCandidate);
+
+                // sieve out all multiples of current candidate
+                for (int i = 2 * primeCandidate; i < primalityMatrix.Length; i += primeCandidate)
+                {
+                    primalityMatrix[i] = false;
+                }
+            }
+
+            return primes;
         }
-    }
 
-    /// <summary>
-    /// Sink thread state object. Used to merge batches into one final output list.
-    /// </summary>
-    internal class SinkState
-    {
-        internal List<ulong> FoundPrimes { get; set; } = new List<ulong>();
-    }
+        private static List<int> SieveOfEratosthenesOptimised(int upperBound)
+        {
+            if (upperBound < 2)
+            {
+                throw new ArgumentException("No primes in desired range; upperBound too small!");
+            }
 
-    /// <summary>
-    /// Source thread state object. Used to create batches.
-    /// </summary>
-    internal class SourceState
-    {
-        internal const ulong Increment = 100_000;
+            if (upperBound == 2)
+            {
+                return new List<int> { 2 };
+            }
 
-        internal ulong CurrentLowerBound { get; set; }
-        internal ulong CurrentUpperBound { get; set; }
-        internal ulong HighestBound { get; set; }
-        internal ulong LowestBound { get; set; }
-    }
+            bool[] primalityMatrix = new bool[upperBound + 1];
 
-    /// <summary>
-    /// Worker thread state object. Empty for now.
-    /// </summary>
-    internal class WorkerState
-    {
+            for (int i = 3; i < primalityMatrix.Length; i += 2)
+            {
+                primalityMatrix[i] = i % 2 != 0;
+            }
+
+            primalityMatrix[0] = false;
+            primalityMatrix[1] = false;
+            primalityMatrix[2] = true;
+
+            List<int> primes = new List<int>() { 2 };
+
+            int primeCandidate;
+            for (primeCandidate = 3; primeCandidate < Math.Sqrt(upperBound); primeCandidate++)
+            {
+                if (!primalityMatrix[primeCandidate]) continue;  // skip non-prime numbers
+
+                primes.Add(primeCandidate);
+
+                // strike out any non-prime multiples of current candidate
+                for (int i = primeCandidate * primeCandidate; i < upperBound; i += 2 * primeCandidate)
+                {
+                    primalityMatrix[i] = false;
+                }
+            }
+
+            if (primeCandidate % 2 == 0)
+            {
+                primeCandidate++;
+            }
+
+            for (int n = primeCandidate; n < upperBound; n += 2)
+            {
+                if (primalityMatrix[n])
+                {
+                    primes.Add(n);
+                }
+            }
+
+            return primes;
+        }
+
+        private static List<int> SegmentedSieveOfEratosthenes(int upperBound, int segmentSize)
+        {
+            if (upperBound < 2)
+            {
+                throw new ArgumentException("No primes in desired range; upperBound too small!");
+            }
+
+            if (upperBound == 2)
+            {
+                return new List<int> { 2 };
+            }
+
+            if (segmentSize > Math.Sqrt(upperBound))
+            {
+                throw new ArgumentException("The segment size cannot be greater than sqrt(upperBound)!");
+            }
+
+            List<int> primes = new List<int>();
+
+
+            int segmentCount = upperBound / segmentSize + (upperBound % segmentSize == 0 ? 0 : 1);
+            int currentLowerBound = 3, currentUpperBound = segmentSize;  // current segment bounds
+            
+            /* Sieving root segment using regular sieve of Eratosthenes */
+            bool[] segmentPrimalityMatrix = new bool[segmentSize];
+
+            for (int i = 3; i < segmentPrimalityMatrix.Length; i += 2)
+            {
+                segmentPrimalityMatrix[i] = i % 2 != 0;
+            }
+
+            segmentPrimalityMatrix[0] = false;
+            segmentPrimalityMatrix[1] = false;
+            segmentPrimalityMatrix[2] = true;
+
+            int primeCandidate;
+            for (primeCandidate = currentLowerBound; primeCandidate < Math.Sqrt(currentUpperBound); primeCandidate++)
+            {
+                if (!segmentPrimalityMatrix[primeCandidate]) continue;  // skip non-prime numbers
+
+                // strike out any non-prime multiples of current candidate
+                for (int i = primeCandidate * primeCandidate; i < currentUpperBound; i += 2 * primeCandidate)
+                {
+                    segmentPrimalityMatrix[i] = false;
+                }
+            }
+
+            for (int n = 0; n < segmentPrimalityMatrix.Length; n++)
+            {
+                if (segmentPrimalityMatrix[n])
+                {
+                    primes.Add(n);
+                }
+
+                segmentPrimalityMatrix[n] = true;
+            }
+
+            /* Sieving intermediate segments */
+
+            int p, currentPrime;
+            double primeLimit;
+            for (int i = 1; i < segmentCount - 1; i++)
+            {
+                // increment bounds to next segment
+                currentLowerBound = currentUpperBound;
+                currentUpperBound += segmentSize;
+
+                // for each currently found prime less than the square root of the current upper segment bound
+                p = 0;
+                currentPrime = primes[p];
+                primeLimit = Math.Sqrt(currentUpperBound);
+                while (currentPrime < primeLimit)
+                {
+                    // find the lowest multiple of the current prime in the current segment
+                    int delta = currentLowerBound % currentPrime;
+                    int lowestPrimeMultiple = currentLowerBound + (delta != 0 ? (currentPrime - delta) : 0);
+
+                    for (int j = lowestPrimeMultiple; j < currentUpperBound; j += currentPrime)
+                    {
+                        segmentPrimalityMatrix[j - currentLowerBound] = false;
+                    }
+
+                    currentPrime = primes[++p];
+                }
+
+                // adding found primes to list and resetting segment primality matrix
+                for (int n = 0; n + currentLowerBound < currentUpperBound; n++)
+                {
+                    if (segmentPrimalityMatrix[n])
+                    {
+                        primes.Add(n + currentLowerBound);
+                    }
+
+                    segmentPrimalityMatrix[n] = true;
+                }
+            }
+
+            /* Sieve tail segment */
+
+            // increment bounds to next segment
+            currentLowerBound = currentUpperBound;
+            currentUpperBound = upperBound;
+
+            // for each currently found prime less than the square root of the current upper segment bound
+            p = 0;
+            currentPrime = primes[p];
+            primeLimit = Math.Sqrt(currentUpperBound);
+            while (currentPrime < primeLimit)
+            {
+                // find the lowest multiple of the current prime in the current segment
+                int delta = currentLowerBound % currentPrime;
+                int lowestPrimeMultiple = currentLowerBound + (delta != 0 ? (currentPrime - delta) : 0);
+
+                for (int j = lowestPrimeMultiple; j < currentUpperBound; j += currentPrime)
+                {
+                    segmentPrimalityMatrix[j - currentLowerBound] = false;
+                }
+
+                currentPrime = primes[++p];
+            }
+
+            // adding found primes to list and resetting segment primality matrix
+            for (int n = 0; n + currentLowerBound < currentUpperBound; n++)
+            {
+                if (segmentPrimalityMatrix[n])
+                {
+                    primes.Add(n + currentLowerBound);
+                }
+
+                segmentPrimalityMatrix[n] = true;
+            }
+
+            return primes;
+        }
     }
 }
