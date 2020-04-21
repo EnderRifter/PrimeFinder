@@ -10,7 +10,7 @@ namespace PrimeFinderCore
         {
             Console.WriteLine("Hello World!");
 
-            const int upperPrimeBound = 15485864; //1_000_000_000;
+            const int upperPrimeBound = 15485864; //1_000_000_000; //15485864;
             const int segmentSize = 3_000; //10_000;
 
             static void Benchmark(Func<int, List<int>> sieveFunc, int upperPrimeBound)
@@ -75,7 +75,7 @@ namespace PrimeFinderCore
                 }
             }
 
-            Benchmark(SieveOfEratosthenes, upperPrimeBound);
+            //Benchmark(SieveOfEratosthenes, upperPrimeBound);
 
             Benchmark(SieveOfEratosthenesOptimised, upperPrimeBound);
 
@@ -100,26 +100,25 @@ namespace PrimeFinderCore
 
             List<int> primes = new List<int>();
 
-            bool[] primalityMatrix = new bool[upperBound + 1];
+            bool[] primalityMatrix = new bool[upperBound];
 
             for (int i = 2; i < primalityMatrix.Length; i++)
             {
-                primalityMatrix[i] = true;
+                primalityMatrix[i - 1] = true;
             }
 
             primalityMatrix[0] = false;
-            primalityMatrix[1] = false;
 
             for (int primeCandidate = 2; primeCandidate < upperBound; primeCandidate++)
             {
-                if (!primalityMatrix[primeCandidate]) continue;  // ignore non-prime number
+                if (!primalityMatrix[primeCandidate - 1]) continue;  // ignore non-prime number
 
                 primes.Add(primeCandidate);
 
                 // sieve out all multiples of current candidate
                 for (int i = 2 * primeCandidate; i < primalityMatrix.Length; i += primeCandidate)
                 {
-                    primalityMatrix[i] = false;
+                    primalityMatrix[i - 1] = false;
                 }
             }
 
@@ -138,41 +137,35 @@ namespace PrimeFinderCore
                 return new List<int> { 2 };
             }
 
-            bool[] primalityMatrix = new bool[upperBound + 1];
+            bool[] primalityMatrix = new bool[upperBound / 2];
 
-            for (int i = 3; i < primalityMatrix.Length; i += 2)
+            for (int i = 0; i < primalityMatrix.Length; i++)
             {
-                primalityMatrix[i] = i % 2 != 0;
+                primalityMatrix[i] = true;
             }
-
-            primalityMatrix[0] = false;
-            primalityMatrix[1] = false;
-            primalityMatrix[2] = true;
 
             List<int> primes = new List<int>() { 2 };
 
+            double maximumTestedPrime = Math.Sqrt(upperBound);
             int primeCandidate;
-            for (primeCandidate = 3; primeCandidate < Math.Sqrt(upperBound); primeCandidate++)
+            for (primeCandidate = 3; primeCandidate < maximumTestedPrime; primeCandidate += 2)
             {
-                if (!primalityMatrix[primeCandidate]) continue;  // skip non-prime numbers
+                int mappedIndex = (primeCandidate / 2) - 1;
+
+                if (!primalityMatrix[mappedIndex]) continue;  // skip non-prime numbers
 
                 primes.Add(primeCandidate);
 
                 // strike out any non-prime multiples of current candidate
                 for (int i = primeCandidate * primeCandidate; i < upperBound; i += 2 * primeCandidate)
                 {
-                    primalityMatrix[i] = false;
+                    primalityMatrix[(i / 2) - 1] = false;
                 }
-            }
-
-            if (primeCandidate % 2 == 0)
-            {
-                primeCandidate++;
             }
 
             for (int n = primeCandidate; n < upperBound; n += 2)
             {
-                if (primalityMatrix[n])
+                if (primalityMatrix[(n / 2) - 1])
                 {
                     primes.Add(n);
                 }
@@ -182,6 +175,133 @@ namespace PrimeFinderCore
         }
 
         private static List<int> SegmentedSieveOfEratosthenes(int upperBound, int segmentSize)
+        {
+            if (upperBound < 2)
+            {
+                throw new ArgumentException("No primes in desired range; upperBound too small!");
+            }
+
+            if (upperBound == 2)
+            {
+                return new List<int> { 2 };
+            }
+
+            if (segmentSize > Math.Sqrt(upperBound))
+            {
+                throw new ArgumentException("The segment size cannot be greater than sqrt(upperBound)!");
+            }
+
+            List<int> primes = new List<int> { 2 };
+
+            static void SieveRootSegment(int upperBound, ref bool[] segmentPrimalityMatrix, ref List<int> primeSet)
+            {
+                for (int i = 0; i < segmentPrimalityMatrix.Length; i++)
+                {
+                    segmentPrimalityMatrix[i] = true;
+                }
+
+                double maximumTestedPrime = Math.Sqrt(upperBound);
+                int primeCandidate;
+                for (primeCandidate = 3; primeCandidate < maximumTestedPrime; primeCandidate += 2)
+                {
+                    if (!segmentPrimalityMatrix[(primeCandidate / 2) - 1]) continue;  // skip non-prime numbers
+
+                    primeSet.Add(primeCandidate);
+
+                    // strike out any non-prime multiples of current candidate
+                    for (int i = primeCandidate * primeCandidate; i < upperBound; i += 2 * primeCandidate)
+                    {
+                        segmentPrimalityMatrix[(i / 2) - 1] = false;
+                    }
+                }
+
+                for (int n = primeCandidate; n < upperBound; n += 2)
+                {
+                    if (segmentPrimalityMatrix[(n / 2) - 1])
+                    {
+                        primeSet.Add(n);
+                    }
+                }
+            }
+
+            static void SieveSegment(int lowerBound, int upperBound, ref bool[] segmentPrimalityMatrix,
+                ref List<int> primeSet)
+            {
+                double maximumTestedPrime = Math.Sqrt(upperBound);
+
+                for (int p = 0; p < primeSet.Count; p++)
+                {
+                    int prime = primeSet[p];
+
+                    if (prime > maximumTestedPrime)
+                    {
+                        break;
+                    }
+                    
+                    // find the lowest multiple of the current prime in the current segment's range
+                    int delta = lowerBound % prime;
+                    int lowestPrimeMultiple = lowerBound + (delta != 0 ? (prime - delta) : 0);
+
+                    // strike out all candidates in range starting from said multiple
+                    for (int primeMultiple = lowestPrimeMultiple; primeMultiple > 0 && primeMultiple < upperBound; primeMultiple += prime)
+                    {
+                        int packedMultiple = primeMultiple - lowerBound;
+
+                        segmentPrimalityMatrix[packedMultiple] = false;
+                    }
+                }
+
+                for (int i = 0; i < segmentPrimalityMatrix.Length; i++)
+                {
+                    if (segmentPrimalityMatrix[i])
+                    {
+                        int unpackedPrime = i + lowerBound;
+
+                        primeSet.Add(unpackedPrime);
+                    }
+
+                    segmentPrimalityMatrix[i] = true;
+                }
+            }
+
+            int segmentLowerBound = 3;
+            int segmentUpperBound = segmentLowerBound + segmentSize > upperBound
+                ? upperBound
+                : segmentLowerBound + segmentSize;
+
+            bool[] rootSegmentPrimalityMatrix = new bool[(segmentUpperBound - segmentLowerBound) / 2];
+
+            /* Sieving root segment for initial primes */
+
+            SieveRootSegment(segmentUpperBound, ref rootSegmentPrimalityMatrix, ref primes);
+
+            /* Sieving remaining segments */
+
+            do
+            {
+                segmentLowerBound = segmentUpperBound;
+                segmentUpperBound = segmentLowerBound + segmentSize > upperBound
+                    ? upperBound
+                    : segmentLowerBound + segmentSize;
+
+                /* Resetting the segment primality matrix, allocating a new one if needed */
+                int currentSegmentSize = segmentUpperBound - segmentLowerBound;
+
+                bool[] segmentPrimalityMatrix = new bool[currentSegmentSize];
+
+                for (int i = 0; i < segmentPrimalityMatrix.Length; i++)
+                {
+                    segmentPrimalityMatrix[i] = true;
+                }
+
+                SieveSegment(segmentLowerBound, segmentUpperBound, ref segmentPrimalityMatrix, ref primes);
+
+            } while (segmentUpperBound != upperBound);
+
+            return primes;
+        }
+
+        private static List<int> SegmentedSieveOfEratosthenesOld(int upperBound, int segmentSize)
         {
             if (upperBound < 2)
             {
