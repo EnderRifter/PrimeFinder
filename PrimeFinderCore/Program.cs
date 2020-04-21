@@ -11,50 +11,50 @@ namespace PrimeFinderCore
         {
             Console.WriteLine("Hello World!");
 
-            const int upperPrimeBound = 15485864; //int.MaxValue; //1_000_000_000;
-            const int segmentSize = 3_000; //40_000; //10_000;
+            const ulong upperPrimeBound = uint.MaxValue;
+            const ulong segmentSize = 44_000;
 
-            static void Benchmark(Func<int, List<int>> sieveFunc, int upperPrimeBound)
+            static void Benchmark(Func<ulong, List<ulong>> sieveFunc, ulong upperPrimeBound)
             {
                 Stopwatch stopwatch = new Stopwatch();
 
                 stopwatch.Start();
-                List<int> primes = sieveFunc(upperPrimeBound);
+                List<ulong> primes = sieveFunc(upperPrimeBound);
                 stopwatch.Stop();
 
-                Console.WriteLine($"We found {primes.Count} primes below {upperPrimeBound} with {sieveFunc.Method.Name} in {stopwatch.ElapsedTicks} ticks");
+                Console.WriteLine($"We found {primes.Count} primes below {upperPrimeBound} with {sieveFunc.Method.Name} in {stopwatch.ElapsedTicks} ticks ({stopwatch.ElapsedMilliseconds} ms)");
 
                 GC.Collect();
             }
 
-            static void BenchmarkSegmented(Func<int, int, List<int>> sieveFunc, int upperPrimeBound, int segmentSize)
+            static void BenchmarkSegmented(Func<ulong, ulong, List<ulong>> sieveFunc, ulong upperPrimeBound, ulong segmentSize)
             {
                 Stopwatch stopwatch = new Stopwatch();
 
                 stopwatch.Start();
-                List<int> primes = sieveFunc(upperPrimeBound, segmentSize);
+                List<ulong> primes = sieveFunc(upperPrimeBound, segmentSize);
                 stopwatch.Stop();
 
-                Console.WriteLine($"We found {primes.Count} primes below {upperPrimeBound} with {sieveFunc.Method.Name} in {stopwatch.ElapsedTicks} ticks");
+                Console.WriteLine($"We found {primes.Count} primes below {upperPrimeBound} with {sieveFunc.Method.Name} in {stopwatch.ElapsedTicks} ticks ({stopwatch.ElapsedMilliseconds} ms)");
 
                 GC.Collect();
             }
 
-            static void SieveDiff(Func<int, List<int>> sieveA, Func<int, List<int>> sieveB, int upperPrimeBound)
+            static void SieveDiff(Func<ulong, List<ulong>> sieveA, Func<ulong, List<ulong>> sieveB, ulong upperPrimeBound)
             {
-                List<int> primeListA = sieveA(upperPrimeBound);
-                HashSet<int> primeSetA = new HashSet<int>(primeListA);
+                List<ulong> primeListA = sieveA(upperPrimeBound);
+                HashSet<ulong> primeSetA = new HashSet<ulong>(primeListA);
                 GC.Collect();
 
-                List<int> primeListB = sieveB(upperPrimeBound);
-                HashSet<int> primeSetB = new HashSet<int>(primeListB);
+                List<ulong> primeListB = sieveB(upperPrimeBound);
+                HashSet<ulong> primeSetB = new HashSet<ulong>(primeListB);
                 GC.Collect();
 
                 Console.WriteLine($"Found {primeListA.Count} primes with sieve A, and {primeListB.Count} primes with sieve B");
 
-                List<int> diff = new List<int>();
+                List<ulong> diff = new List<ulong>();
 
-                foreach (int item in primeListA)
+                foreach (ulong item in primeListA)
                 {
                     if (primeSetB.Contains(item)) continue;
 
@@ -62,7 +62,7 @@ namespace PrimeFinderCore
                     diff.Add(item);
                 }
 
-                foreach (int item in primeListB)
+                foreach (ulong item in primeListB)
                 {
                     if (primeSetA.Contains(item)) continue;
 
@@ -76,18 +76,16 @@ namespace PrimeFinderCore
                 }
             }
 
-            Benchmark(SieveOfEratosthenes, upperPrimeBound);
+            //Benchmark(SieveOfEratosthenes, upperPrimeBound);
 
-            Benchmark(SieveOfEratosthenesOptimised, upperPrimeBound);
+            //Benchmark(SieveOfEratosthenesOptimised, upperPrimeBound);
 
             BenchmarkSegmented(SegmentedSieveOfEratosthenes, upperPrimeBound, segmentSize);
-
-            //SieveDiff(SieveOfEratosthenesOptimised, bound => SegmentedSieveOfEratosthenes(bound, segmentSize), upperPrimeBound);
 
             Console.WriteLine("Goodbye World!");
         }
 
-        private static List<int> SieveOfEratosthenes(int upperBound)
+        private static List<ulong> SieveOfEratosthenes(ulong upperBound)
         {
             if (upperBound < 2)
             {
@@ -96,37 +94,37 @@ namespace PrimeFinderCore
             
             if (upperBound == 2)
             {
-                return new List<int> { 2 };
+                return new List<ulong> { 2 };
             }
 
-            List<int> primes = new List<int>();
+            List<ulong> primes = new List<ulong>();
 
-            bool[] primalityMatrix = new bool[upperBound];
+            bool[] primalityMatrix = new bool[upperBound - 2];
 
             for (int i = 2; i < primalityMatrix.Length; i++)
             {
-                primalityMatrix[i - 1] = true;
+                primalityMatrix[i - 2] = true;
             }
 
             primalityMatrix[0] = false;
 
-            for (int prime = 2; prime < upperBound; prime++)
+            for (ulong prime = 2; prime < upperBound; prime++)
             {
-                if (!primalityMatrix[prime - 1]) continue;  // ignore non-prime number
+                if (!primalityMatrix[prime - 2]) continue;  // ignore non-prime number
 
                 primes.Add(prime);
 
                 // sieve out all multiples of current candidate
-                for (int primeMultiple = 2 * prime; primeMultiple > 0 && primeMultiple < upperBound; primeMultiple += prime)
+                for (ulong primeMultiple = 2 * prime; primeMultiple < upperBound; primeMultiple += prime)
                 {
-                    primalityMatrix[primeMultiple - 1] = false;
+                    primalityMatrix[primeMultiple - 2] = false;
                 }
             }
 
             return primes;
         }
 
-        private static List<int> SieveOfEratosthenesOptimised(int upperBound)
+        private static List<ulong> SieveOfEratosthenesOptimised(ulong upperBound)
         {
             if (upperBound < 2)
             {
@@ -135,7 +133,7 @@ namespace PrimeFinderCore
 
             if (upperBound == 2)
             {
-                return new List<int> { 2 };
+                return new List<ulong> { 2 };
             }
 
             bool[] primalityMatrix = new bool[upperBound / 2];
@@ -145,10 +143,10 @@ namespace PrimeFinderCore
                 primalityMatrix[i] = true;
             }
 
-            List<int> primes = new List<int> { 2 };
+            List<ulong> primes = new List<ulong> { 2 };
 
             double maximumTestedPrime = Math.Sqrt(upperBound);
-            int prime;
+            ulong prime;
             for (prime = 3; prime < maximumTestedPrime; prime += 2)
             {
                 if (!primalityMatrix[(prime / 2) - 1]) continue;  // skip non-prime numbers
@@ -156,14 +154,14 @@ namespace PrimeFinderCore
                 primes.Add(prime);
 
                 // strike out any non-prime multiples of current candidate
-                for (int primeMultiple = prime * prime; primeMultiple > 0 && primeMultiple < upperBound; primeMultiple += 2 * prime)
+                for (ulong primeMultiple = prime * prime; primeMultiple < upperBound; primeMultiple += 2 * prime)
                 {
                     primalityMatrix[(primeMultiple / 2) - 1] = false;
                 }
             }
 
             // read remains of buffer to find the primes left and add them to the list
-            for (int number = prime; number < upperBound; number += 2)
+            for (ulong number = prime; number < upperBound; number += 2)
             {
                 if (primalityMatrix[(number / 2) - 1])
                 {
@@ -174,7 +172,7 @@ namespace PrimeFinderCore
             return primes;
         }
 
-        private static List<int> SegmentedSieveOfEratosthenes(int upperBound, int segmentSize)
+        private static List<ulong> SegmentedSieveOfEratosthenes(ulong upperBound, ulong segmentSize)
         {
             if (upperBound < 2)
             {
@@ -183,7 +181,7 @@ namespace PrimeFinderCore
 
             if (upperBound == 2)
             {
-                return new List<int> { 2 };
+                return new List<ulong> { 2 };
             }
 
             if (segmentSize > Math.Sqrt(upperBound))
@@ -191,10 +189,10 @@ namespace PrimeFinderCore
                 throw new ArgumentException("The segment size cannot be greater than sqrt(upperBound)!");
             }
             
-            static void SieveRootSegment(int upperBound, ref bool[] segmentPrimalityMatrix, ref List<int> primeSet)
+            static void SieveRootSegment(ulong upperBound, ref bool[] segmentPrimalityMatrix, ref List<ulong> primeSet)
             {
                 double maximumTestedPrime = Math.Sqrt(upperBound);
-                int prime;
+                ulong prime;
                 for (prime = 3; prime < maximumTestedPrime; prime += 2)
                 {
                     if (!segmentPrimalityMatrix[(prime / 2) - 1]) continue;  // skip non-prime numbers
@@ -202,13 +200,13 @@ namespace PrimeFinderCore
                     primeSet.Add(prime);
 
                     // strike out any non-prime multiples of current candidate
-                    for (int primeMultiple = prime * prime; primeMultiple > 0 && primeMultiple < upperBound; primeMultiple += 2 * prime)
+                    for (ulong primeMultiple = prime * prime; primeMultiple < upperBound; primeMultiple += 2 * prime)
                     {
                         segmentPrimalityMatrix[(primeMultiple / 2) - 1] = false;
                     }
                 }
 
-                for (int number = prime; number < upperBound; number += 2)
+                for (ulong number = prime; number < upperBound; number += 2)
                 {
                     if (segmentPrimalityMatrix[(number / 2) - 1])
                     {
@@ -217,16 +215,14 @@ namespace PrimeFinderCore
                 }
             }
 
-            static void SieveSegment(int lowerBound, int upperBound, ref bool[] segmentPrimalityMatrix,
-                ref List<int> primeSet)
+            static void SieveSegment(ulong lowerBound, ulong upperBound, ref bool[] segmentPrimalityMatrix,
+                ref List<ulong> primeSet)
             {
                 double maximumTestedPrime = Math.Sqrt(upperBound);
 
-                //Console.WriteLine($"Sieving segment: {lowerBound} -> {upperBound} (size: {upperBound - lowerBound})");
-
                 for (int p = 0; p < primeSet.Count; p++)
                 {
-                    int prime = primeSet[p];
+                    ulong prime = primeSet[p];
 
                     if (prime > maximumTestedPrime)
                     {
@@ -234,13 +230,13 @@ namespace PrimeFinderCore
                     }
 
                     // find the lowest multiple of the current prime in the current segment's range
-                    int delta = lowerBound % prime;
-                    int lowestPrimeMultiple = lowerBound + (delta != 0 ? (prime - delta) : 0);
+                    ulong delta = lowerBound % prime;
+                    ulong lowestPrimeMultiple = lowerBound + (delta != 0 ? (prime - delta) : 0);
 
                     // strike out all candidates in range starting from said multiple
-                    for (int primeMultiple = lowestPrimeMultiple; primeMultiple > 0 && primeMultiple < upperBound; primeMultiple += prime)
+                    for (ulong primeMultiple = lowestPrimeMultiple; primeMultiple < upperBound; primeMultiple += prime)
                     {
-                        int packedMultiple = primeMultiple - lowerBound;
+                        ulong packedMultiple = primeMultiple - lowerBound;
 
                         segmentPrimalityMatrix[packedMultiple] = false;
                     }
@@ -250,7 +246,7 @@ namespace PrimeFinderCore
                 {
                     if (segmentPrimalityMatrix[i])
                     {
-                        int unpackedPrime = i + lowerBound;
+                        ulong unpackedPrime = (ulong)i + lowerBound;
 
                         primeSet.Add(unpackedPrime);
                     }
@@ -259,11 +255,11 @@ namespace PrimeFinderCore
                 }
             }
 
-            List<int> primes = new List<int> { 2 };
+            List<ulong> primes = new List<ulong> { 2 };
 
-            int segmentLowerBound = 3;
-            int newSegmentUpperBound = segmentLowerBound + segmentSize;
-            int segmentUpperBound = newSegmentUpperBound > upperBound || newSegmentUpperBound < 0
+            ulong segmentLowerBound = 3;
+            ulong newSegmentUpperBound = segmentLowerBound + segmentSize;
+            ulong segmentUpperBound = newSegmentUpperBound > upperBound
                 ? upperBound
                 : newSegmentUpperBound;
 
@@ -292,20 +288,20 @@ namespace PrimeFinderCore
                 segmentLowerBound = segmentUpperBound;
                 newSegmentUpperBound = segmentLowerBound + segmentSize;
 
-                if (newSegmentUpperBound > upperBound || newSegmentUpperBound < 0)
+                if (newSegmentUpperBound > upperBound)
                 {
                     // our exit condition. we have reached the end and either exceeded the upper bound, or wrapped around
                     segmentUpperBound = upperBound;
 
-                    int currentSegmentSize = upperBound - segmentLowerBound;
+                    ulong currentSegmentSize = upperBound - segmentLowerBound;
 
                     //Console.WriteLine($"Sieving final segment: {segmentLowerBound} -> {segmentUpperBound} (size: {currentSegmentSize})");
 
-                    if (segmentPrimalityMatrix.Length > currentSegmentSize)
+                    if ((ulong)segmentPrimalityMatrix.Length > currentSegmentSize)
                     {
                         // we need to blot out any values that are greater than our upper bound.
                         // this occurs when the buffer is larger than the current search space
-                        for (int i = currentSegmentSize; i < segmentPrimalityMatrix.Length; i++)
+                        for (ulong i = currentSegmentSize; i < (ulong)segmentPrimalityMatrix.Length; i++)
                         {
                             segmentPrimalityMatrix[i] = false;
                         }
